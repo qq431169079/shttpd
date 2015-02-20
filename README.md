@@ -18,3 +18,6 @@ Each parameters without argument will be parsed from config file
 - add child process
 - add response with file
 - add sgi script execution function
+
+###Get more info from my blog
+- Offensice-Security Georgia: [http://off-sec.com/](http://off-sec.com)
