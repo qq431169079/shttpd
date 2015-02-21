@@ -24,14 +24,19 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <ctype.h>
+#include <strings.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <sys/stat.h>
 #include <sys/time.h>
 #include <netdb.h>
 #include <signal.h>
 #include "parser.h"
+#include "headers.h"
 
+#define ISspace(x) isspace((int)(x))
 #define MAXMSG  512
 #define VERSION "0.3 Nightly"
 #define BUILD 9
@@ -123,32 +128,127 @@ int create_socket(uint16_t port)
 
 
 /*------------------------------------------
-Read request from client and answer       */
-int read_request(int client, int verbose)
+Cat file                                  */
+void cat_file(int client, FILE *resource)
 {
-	char buffer[MAXMSG];
-	int nbytes;
+	char buf[1024];
 
-	/* Read Reaquest */
-	nbytes = read(client, buffer, MAXMSG);
-
-	if (nbytes < 0)
+	fgets(buf, sizeof(buf), resource);
+	while (!feof(resource))
 	{
-		perror("read");
-		return 0;
+		send(client, buf, strlen(buf), 0);
+		fgets(buf, sizeof(buf), resource);
 	}
-	else if (!nbytes) return 1;
+}
+
+
+/*------------------------------------------
+Read request from client                  */
+int read_request(int sock, char *buf, int size)
+{
+	int i = 0;
+	char c = '\0';
+	int n;
+
+	while ((i < size - 1) && (c != '\n'))
+	{
+		n = read(sock, &c, 1);
+		if (n > 0)
+		{
+			if (c == '\r')
+			{
+				n = read(sock, &c, 1);
+				if ((n > 0) && (c == '\n')) read(sock, &c, 1);
+				else c = '\n';
+			}
+			buf[i] = c;
+			i++;
+		}
+		else c = '\n';
+	}
+	buf[i] = '\0';
+ 
+	return i;
+}
+
+
+/*------------------------------------------
+Return file to client                     */
+void return_file(int client, const char *filename)
+{
+	FILE *resource = NULL;
+	int nbytes = 1;
+	char buf[1024];
+
+	buf[0] = 'A'; buf[1] = '\0';
+	while ((nbytes > 0) && strcmp("\n", buf)) nbytes = read_request(client, buf, sizeof(buf));
+
+	resource = fopen(filename, "r");
+	if (resource == NULL) not_found(client);
 	else
 	{
-		/* Print incoming request if verbose flag enabled */
-		if (verbose) printf("%s\n", buffer);
+		headers(client, filename);
+		cat_file(client, resource);
+	}
+	fclose(resource);
+}
 
-		/* Send header to client */
-		strcpy(buffer, "HTTP/1.0 200 OK\r\nContent-Type: text/plain\r\n\r\n");
-		send(client, buffer, strlen(buffer), 0);
-		/* Send message to client */
-		strcpy(buffer, "hello from shttpd!\n");
-		send(client, buffer, strlen(buffer), 0);
+
+/*------------------------------------------
+Read request from client and answer       */
+int accept_request(int client, int verbose, char *path)
+{
+	char buf[MAXMSG];
+	int nbytes;
+	char method[255];
+	char url[255];
+	size_t i, j;
+	struct stat st;
+	char *query_string = NULL;
+
+	nbytes = read_request(client, buf, sizeof(buf));
+	i = 0; j = 0;
+	while (!ISspace(buf[j]) && (i < sizeof(method) - 1))
+	{
+		method[i] = buf[j];
+		i++; j++;
+	}
+	method[i] = '\0';
+
+	if (strcasecmp(method, "GET") && strcasecmp(method, "POST"))
+	{
+		unimplemented(client);
+		return 1;
+	}
+
+	i = 0;
+	while (ISspace(buf[j]) && (j < sizeof(buf))) j++;
+	while (!ISspace(buf[j]) && (i < sizeof(url) - 1) && (j < sizeof(buf)))
+	{
+		url[i] = buf[j];
+		i++; j++;
+	}
+	url[i] = '\0';
+
+	if (strcasecmp(method, "GET") == 0)
+	{
+		query_string = url;
+		while ((*query_string != '?') && (*query_string != '\0'))
+			query_string++;
+	}
+
+	sprintf(path, "%s%s", path, url);
+	if (path[strlen(path) - 1] == '/') strcat(path, "index.html");
+	if (stat(path, &st) == -1) 
+	{
+		while ((nbytes > 0) && strcmp("\n", buf))
+		nbytes = read_request(client, buf, sizeof(buf));
+		not_found(client);
+	}
+	else
+	{
+		if ((st.st_mode & S_IFMT) == S_IFDIR) strcat(path, "/index.html");
+		return_file(client, path);
 	}
 
 	return 1;
@@ -282,7 +382,7 @@ int main(int argc, char *argv[])
 				else
 				{
 					/* Read request and answer */
-					if(read_request(i, val.verbose)) 
+					if(accept_request(i, val.verbose, val.root)) 
 					{
 						close(i);
 						FD_CLR(i, &active_fd_set);
