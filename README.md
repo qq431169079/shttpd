@@ -1,4 +1,4 @@
-## shttpd 0.3 Nightly
+## shttpd 0.3.1 Nightly
 ###Description
 shttpd is simple http non-blocking web server which uses tcp sockets and select(). Softwear is written for educational purposes and is distributed in the hope that it will be useful for anyone interested in this field.
 
