@@ -16,7 +16,6 @@ Each parameters without argument will be parsed from config file
 ###TODO
 - add threads
 - add child process
-- add response with file
 - add sgi script execution function
 
 ###Get more info from my blog
