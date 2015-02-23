@@ -38,8 +38,8 @@
 
 #define ISspace(x) isspace((int)(x))
 #define MAXMSG  512
-#define VERSION "0.3 Nightly"
-#define BUILD 9
+#define VERSION "0.3.1 Nightly"
+#define BUILD 11
 
 
 /*-----------------------------------------
@@ -151,7 +151,6 @@ void return_file(int client, const char *filename)
 	char buf[1024];
 
 	buf[0] = 'A'; buf[1] = '\0';
-	// while ((nbytes > 0) && strcmp("\n", buf)) nbytes = read_request(client, buf, sizeof(buf));
 
 	resource = fopen(filename, "r");
 	if (resource == NULL) not_found(client);
