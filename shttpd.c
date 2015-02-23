@@ -143,36 +143,6 @@ void cat_file(int client, FILE *resource)
 
 
 /*------------------------------------------
-Read request from client                  */
-int read_request(int sock, char *buf, int size)
-{
-	int i = 0;
-	char c = '\0';
-	int n;
-
-	while ((i < size - 1) && (c != '\n'))
-	{
-		n = read(sock, &c, 1);
-		if (n > 0)
-		{
-			if (c == '\r')
-			{
-				n = read(sock, &c, 1);
-				if ((n > 0) && (c == '\n')) read(sock, &c, 1);
-				else c = '\n';
-			}
-			buf[i] = c;
-			i++;
-		}
-		else c = '\n';
-	}
-	buf[i] = '\0';
- 
-	return i;
-}
-
-
-/*------------------------------------------
 Return file to client                     */
 void return_file(int client, const char *filename)
 {
@@ -181,7 +151,7 @@ void return_file(int client, const char *filename)
 	char buf[1024];
 
 	buf[0] = 'A'; buf[1] = '\0';
-	while ((nbytes > 0) && strcmp("\n", buf)) nbytes = read_request(client, buf, sizeof(buf));
+	// while ((nbytes > 0) && strcmp("\n", buf)) nbytes = read_request(client, buf, sizeof(buf));
 
 	resource = fopen(filename, "r");
 	if (resource == NULL) not_found(client);
@@ -196,59 +166,73 @@ void return_file(int client, const char *filename)
 
 /*------------------------------------------
 Read request from client and answer       */
-int accept_request(int client, int verbose, char *path)
+int accept_request(int client, int verbose, char *root)
 {
-	char buf[MAXMSG];
-	int nbytes;
-	char method[255];
-	char url[255];
-	size_t i, j;
 	struct stat st;
 	char *query_string = NULL;
+	char buffer[MAXMSG];
+	char method[255];
+	char path[256];
+	char url[256];
+	int nbytes;
+	size_t i, j;
 
-	nbytes = read_request(client, buf, sizeof(buf));
-	i = 0; j = 0;
-	while (!ISspace(buf[j]) && (i < sizeof(method) - 1))
-	{
-		method[i] = buf[j];
-		i++; j++;
-	}
-	method[i] = '\0';
+	/* Read Reaquest */
+	nbytes = read(client, buffer, MAXMSG);
 
-	if (strcasecmp(method, "GET") && strcasecmp(method, "POST"))
+	if (nbytes < 0)
 	{
-		unimplemented(client);
-		return 1;
+		perror("read");
+		return 0;
 	}
-
-	i = 0;
-	while (ISspace(buf[j]) && (j < sizeof(buf))) j++;
-	while (!ISspace(buf[j]) && (i < sizeof(url) - 1) && (j < sizeof(buf)))
-	{
-		url[i] = buf[j];
-		i++; j++;
-	}
-	url[i] = '\0';
-
-	if (strcasecmp(method, "GET") == 0)
-	{
-		query_string = url;
-		while ((*query_string != '?') && (*query_string != '\0'))
-			query_string++;
-	}
-
-	sprintf(path, "%s%s", path, url);
-	if (path[strlen(path) - 1] == '/') strcat(path, "index.html");
-	if (stat(path, &st) == -1) 
-	{
-		while ((nbytes > 0) && strcmp("\n", buf))
-		nbytes = read_request(client, buf, sizeof(buf));
-		not_found(client);
-	}
+	else if (!nbytes) return 1;
 	else
 	{
-		if ((st.st_mode & S_IFMT) == S_IFDIR) strcat(path, "/index.html");
-		return_file(client, path);
+		/* Print incoming request if verbose flag enabled */
+		if (verbose) printf("%s\n", buffer);
+
+		i = 0; j = 0;
+		while (!ISspace(buffer[j]) && (i < sizeof(method) - 1))
+		{
+			method[i] = buffer[j];
+			i++; j++;
+		}
+		method[i] = '\0';
+
+		if (strcasecmp(method, "GET") && strcasecmp(method, "POST"))
+		{
+			unimplemented(client);
+			return 1;
+		}
+
+		i = 0;
+		while (ISspace(buffer[j]) && (j < sizeof(buffer))) j++;
+		while (!ISspace(buffer[j]) && (i < sizeof(url) - 1) && (j < sizeof(buffer)))
+		{
+			url[i] = buffer[j];
+			i++; j++;
+		}
+		url[i] = '\0';
+
+		if (strcasecmp(method, "GET") == 0)
+		{
+			query_string = url;
+			while ((*query_string != '?') && (*query_string != '\0'))
+				query_string++;
+		}
+
+		sprintf(path, "%s%s", root, url);
+		if (path[strlen(path) - 1] == '/') strcat(path, "index.html");
+		if (stat(path, &st) == -1) 
+		{
+			if (verbose) printf("Error: 404! Requested image not found: %s\n", path);
+			not_found(client);
+		}
+		else
+		{
+			if ((st.st_mode & S_IFMT) == S_IFDIR) strcat(path, "/index.html");
+			return_file(client, path);
+		}
 	}
 
 	return 1;
@@ -275,7 +259,7 @@ static int handler(void *config, const char *section, const char *name,
 		return -1;
 	}
 
-	if(val->verbose) printf("Config parsed successfully.\n");
+	if(val->verbose) printf("Config parsed successfully.\n\n");
 
 	return 1;
 }
