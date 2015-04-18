@@ -1,9 +1,9 @@
-LIB = -lnsl -lsocket
+LIB = -lnsl
 OBJ = headers.o parser.o 
-CXXFLAGS = -O2 -g
+CFLAGS = -O2 -g
 
 shttpd: shttpd.c $(OBJ)
-	gcc $(CXXFLAGS) -o shttpd shttpd.c $(OBJ) $(LIB)
+	gcc $(CFLAGS) -o shttpd shttpd.c $(OBJ) $(LIB)
 
 headers.o: headers.h
 parser.o: parser.h
