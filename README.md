@@ -1,14 +1,14 @@
-## shttpd 0.3.1 Nightly
+## shttpd 1.0.3 Snapshot
 ###Description
 shttpd is simple http non-blocking web server which uses tcp sockets and select(). Softwear is written for educational purposes and is distributed in the hope that it will be useful for anyone interested in this field.
 
 ###Usage
 ```
-Usage: shttpd [-p <port>] [-t <number>] [-v] [-h]
+Usage: shttpd [-a <addr>] [-p <port>] [-t <number>] [-v] [-h]
 options are:
+ -a <addr>       # address of server
  -p <port>       # listening port of server
  -t <number>     # threads proces of server
- -v              # verbose
  -h              # prints version and usage
 ```
 Each parameters without argument will be parsed from config file

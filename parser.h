@@ -12,7 +12,7 @@ For include header in CPP code */
 extern "C" {
 #endif
 
-#include <stdio.h>
+#include "stdinc.h"
 
 /*---------------------------------------------------------
 Parse File                                           */

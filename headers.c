@@ -1,16 +1,18 @@
-/*--------------------------------------------
+/*-----------------------------------------------------
 Name: header.c
-Description: return headers to clients       
---------------------------------------------*/
+Date: 2015.05.09
+Auth: Sun Dro (a.k.a 7th Ghost / kala13x)
+Desc: Headers for shttpd project
+-----------------------------------------------------*/
 
-#include <stdio.h>
-#include <string.h>
-#include <sys/socket.h>
+
+#include "stdinc.h"
 #include "headers.h"
 
 
-/*--------------------------------------------
-Server status OK header                     */
+/*---------------------------------------------
+| Server status OK header
+---------------------------------------------*/
 void headers(int client, const char *filename)
 {
     char buf[1024];
@@ -28,8 +30,9 @@ void headers(int client, const char *filename)
 
 
 /*--------------------------------------------
-Not found heasder                           */
-void not_found(int client)
+| Not found heasder
+--------------------------------------------*/
+void not_found(int client, char* path)
 {
     char buf[1024];
 
@@ -43,7 +46,7 @@ void not_found(int client)
     send(client, buf, strlen(buf), 0);
     sprintf(buf, "<HTML><TITLE>Not Found</TITLE>\r\n");
     send(client, buf, strlen(buf), 0);
-    sprintf(buf, "<BODY><P>Error: 404! Requested image not found.\r\n");
+    sprintf(buf, "<BODY><P>Error: 404! Requested content not found: %s\r\n", path);
     send(client, buf, strlen(buf), 0);
     sprintf(buf, "</BODY></HTML>\r\n");
     send(client, buf, strlen(buf), 0);
@@ -51,7 +54,8 @@ void not_found(int client)
 
 
 /*--------------------------------------------
-Bad request heasder                         */
+| Bad request heasder
+--------------------------------------------*/
 void bad_request(int client)
 {
     char buf[1024];
@@ -70,7 +74,8 @@ void bad_request(int client)
 
 
 /*--------------------------------------------
-Internal error heasder                      */
+| Internal error heasder
+--------------------------------------------*/
 void internal_error(int client)
 {
     char buf[1024];
@@ -86,7 +91,8 @@ void internal_error(int client)
 }
 
 /*--------------------------------------------
-Unimplemented error heasder                 */
+| Unimplemented error heasder
+--------------------------------------------*/
 void unimplemented(int client)
 {
     char buf[1024];

@@ -1,14 +1,19 @@
 LIB = -lnsl
-OBJ = headers.o parser.o 
-CFLAGS = -O2 -g
+OBJ = o
+CFLAGS = -g -O2 -Wall -msse -mmmx
+OBJS = shttpd.$(OBJ) headers.$(OBJ) parser.$(OBJ) info.$(OBJ) slog.$(OBJ)
 
-shttpd: shttpd.c $(OBJ)
-	gcc $(CFLAGS) -o shttpd shttpd.c $(OBJ) $(LIB)
+shttpd: $(OBJS)
+	$(CC) $(CFLAGS) -o shttpd $(OBJS) $(LIB)
 
-headers.o: headers.h
-parser.o: parser.h
+shttpd.$(OBJ): headers.h parser.h info.h slog.h stdinc.h
+headers.$(OBJ): headers.h stdinc.h
+parser.$(OBJ): parser.h stdinc.h
+info.$(OBJ): info.h stdinc.h
+slog.$(OBJ): slog.h stdinc.h
+
 
 .PHONY: clean
 
 clean:
-	$(RM) shttpd $(OBJ)
+	$(RM) shttpd $(OBJS)

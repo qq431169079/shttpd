@@ -19,87 +19,67 @@
 ---------------------------------------------------------------------------*/
 
 
-#include <stdio.h>
-#include <errno.h>
-#include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
-#include <ctype.h>
-#include <strings.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <sys/stat.h>
-#include <sys/time.h>
-#include <netdb.h>
-#include <signal.h>
-#include "parser.h"
+#include "stdinc.h"
 #include "headers.h"
+#include "parser.h"
+#include "info.h"
+#include "slog.h"
 
 #define ISspace(x) isspace((int)(x))
 #define MAXMSG  512
-#define VERSION "0.3.1 Nightly"
-#define BUILD 11
 
 
-/*-----------------------------------------
-Main structure of variables              */
+/*---------------------------------------------
+| Main structure of variables
+---------------------------------------------*/
 typedef struct {
 	int port;
 	int threads;
-	short verbose;
-	char *root;
+	char* root;
+	char* addr;
 } values;
 
 
-/*-----------------------------------------
-Initialise variables                     */
-void MainValues_init(values *val)
+/*---------------------------------------------
+| Initialise variables
+---------------------------------------------*/
+void init_values(values *val)
 {
-	val->verbose = 0;
 	val->port = 69;
 	val->threads = 0;
 	val->root = NULL;
 }
 
 
-/*---------------------------------------------------------------------
-Get version                                                  */
-const char* GetVersion()
+/*---------------------------------------------
+| Read SIGPIPE signal
+---------------------------------------------*/
+void sig_handler(int sig) 
 {
-	static char verstr[128];
-	sprintf(verstr, "%s Build %d", VERSION, BUILD);
-	return verstr;
+	/* Handle signals */
+    if (sig == SIGILL || sig == SIGSEGV) 
+    {
+    	slog(0, "[ERROR] Internal server error");
+    	exit(-1);
+    }
+
+    /* Handle exit signal */
+    if (sig == SIGINT) 
+    {
+    	slog(0, "[LIVE] Cleanup on exit");
+    	exit(0);	
+    }
+
+	slog(0, "[SIGPIPE] Broken Pipe");
 }
 
 
-/*---------------------------------------------------------------------
-Print help message                                                   */
-void usage(void) 
-{
-	printf("=========================================\n");
-	printf("shttpd Version: %s\n", GetVersion());
-	printf("=========================================\n");
-	printf("Usage: shttpd [-p <port>] [-t <number>] [-v] [-h]\n");
-	printf("options are:\n");
-	printf(" -p <port>       # listening port of server\n");
-	printf(" -t <number>     # threads proces of server\n");
-	printf(" -v              # verbose\n");
-	printf(" -h              # prints version and usage\n\n");
-}
-
-
-/*--------------------------------------------
-Read SIGPIPE signal                         */
-void sig_handler() 
-{
-	printf("%s\n", "SIGPIPE: Broken Pipe!");
-}
-
-
-/* Create socket */
+/*---------------------------------------------
+| Create and return socket
+---------------------------------------------*/
 int create_socket(uint16_t port)
 {
+	/* Used variables */
 	int sock;
 	struct sockaddr_in name;
 
@@ -127,12 +107,14 @@ int create_socket(uint16_t port)
 }
 
 
-/*------------------------------------------
-Cat file                                  */
+/*---------------------------------------------
+| Cat file
+---------------------------------------------*/
 void cat_file(int client, FILE *resource)
 {
 	char buf[1024];
 
+	/* Read file context */
 	fgets(buf, sizeof(buf), resource);
 	while (!feof(resource))
 	{
@@ -142,18 +124,16 @@ void cat_file(int client, FILE *resource)
 }
 
 
-/*------------------------------------------
-Return file to client                     */
+/*---------------------------------------------
+| Return file to client
+---------------------------------------------*/
 void return_file(int client, const char *filename)
 {
 	FILE *resource = NULL;
-	int nbytes = 1;
-	char buf[1024];
 
-	buf[0] = 'A'; buf[1] = '\0';
-
+	/* Read file */
 	resource = fopen(filename, "r");
-	if (resource == NULL) not_found(client);
+	if (resource == NULL) not_found(client, (char*)filename);
 	else
 	{
 		headers(client, filename);
@@ -163,10 +143,12 @@ void return_file(int client, const char *filename)
 }
 
 
-/*------------------------------------------
-Read request from client and answer       */
-int accept_request(int client, int verbose, char *root)
+/*---------------------------------------------
+| Read request from client and answer
+---------------------------------------------*/
+int accept_request(int client, char *root)
 {
+	/* Used variables */
 	struct stat st;
 	char *query_string = NULL;
 	char buffer[MAXMSG];
@@ -188,7 +170,8 @@ int accept_request(int client, int verbose, char *root)
 	else
 	{
 		/* Print incoming request if verbose flag enabled */
-		if (verbose) printf("%s\n", buffer);
+		slog(2, "[LIVE] Incoming request:");
+		slog(2, "%s", buffer);
 
 		i = 0; j = 0;
 		while (!ISspace(buffer[j]) && (i < sizeof(method) - 1))
@@ -198,6 +181,7 @@ int accept_request(int client, int verbose, char *root)
 		}
 		method[i] = '\0';
 
+		/* Get request type */
 		if (strcasecmp(method, "GET") && strcasecmp(method, "POST"))
 		{
 			unimplemented(client);
@@ -221,11 +205,13 @@ int accept_request(int client, int verbose, char *root)
 		}
 
 		sprintf(path, "%s%s", root, url);
+		slog(0, "[LIVE] Get * %s", url);
+
 		if (path[strlen(path) - 1] == '/') strcat(path, "index.html");
 		if (stat(path, &st) == -1) 
 		{
-			if (verbose) printf("Error: 404! Requested image not found: %s\n", path);
-			not_found(client);
+			slog(1, "[ERROR] 404! Requested content not found: %s", path);
+			not_found(client, url);
 		}
 		else
 		{
@@ -238,8 +224,9 @@ int accept_request(int client, int verbose, char *root)
 }
 
 
-/*---------------------------------------------------------------------
-Parse config file                                                    */
+/*---------------------------------------------
+| Parse config file
+---------------------------------------------*/
 static int handler(void *config, const char *section, const char *name,
                    const char *value)
 {
@@ -250,26 +237,25 @@ static int handler(void *config, const char *section, const char *name,
 		val->threads = atoi(value);
 	} else if (MATCH("config", "port")) {
 		val->port = atoi(value);
-	} else if (MATCH("config", "verbose")) {
-		val->verbose = atoi(value);
+	} else if (MATCH("config", "server")) {
+		val->addr = strdup(value);;
 	} else if (MATCH("config", "root")) {
 		val->root = strdup(value);
 	} else {
 		return -1;
 	}
 
-	if(val->verbose) printf("Config parsed successfully.\n\n");
-
 	return 1;
 }
 
 
-/*---------------------------------------------------------------------
-Parse commandline arguments                                          */
+/*---------------------------------------------
+| Parse commandline arguments
+---------------------------------------------*/
 int parse_arguments(int argc, char *argv[], values *val)
 {
 	int c;
-	while ( (c = getopt(argc, argv, "p:t:v1:h1")) != -1) {
+	while ( (c = getopt(argc, argv, "p:t:a:h1")) != -1) {
 		switch (c) {
 		case 'p':
 			val->port = atoi(optarg);
@@ -277,8 +263,8 @@ int parse_arguments(int argc, char *argv[], values *val)
 		case 't':
 			val->threads = atoi(optarg);
 			break;
-		case 'v':
-			val->verbose = 1;
+		case 'a':
+			val->addr = strdup(optarg);
 			break;
 		case 'h':
 		default:
@@ -287,37 +273,45 @@ int parse_arguments(int argc, char *argv[], values *val)
 		}
 	}
 
-	if(val->verbose) printf("Argument parsed successfully.\n");
-
 	return 0;
 }
 
 
-/* Main function */
+/*---------------------------------------------
+| Main function
+---------------------------------------------*/
 int main(int argc, char *argv[])
 {
-	int i;
-	int sock;
-	int s_new;
+	/* Used variables */
+	int i, sock, s_new;
 	struct sockaddr_in clientname;
 	fd_set active_fd_set, read_fd_set;
 	socklen_t size;
-
-	/* Read SIGPIPE signal */
-	signal(SIGPIPE, sig_handler);
-
-	/* Used variables */
 	values val;
 
-	/* Initialise used variables */
-	MainValues_init(&val);
+	/* Read signals */
+	signal(SIGPIPE, sig_handler);
+    signal(SIGINT, sig_handler);
+    signal(SIGSEGV, sig_handler);
+    signal(SIGILL , sig_handler);
+
+	/* Greet */
+	greet();
+
+	/* Initialise variables */
+	init_values(&val);
+	init_slog("shttpd", 3);
 
 	/* Read Config File */
 	if (parse_cfg("config.cfg", handler, &val) < 0) 
-		printf("%s\n", "Unable to parse file 'config.cfg'.");
+		slog(0, "[ERROR] Unable to parse file 'config.cfg'");
+	else
+		slog(3, "[LIVE] Config parsed successfully.");
 
 	/* Parse Commandline Arguments */
-	if (parse_arguments(argc, argv, &val)) return 0;
+	if (parse_arguments(argc, argv, &val) >= 0) 
+		slog(3, "[LIVE] Argument parsed successfully.");
+	else return 0;
 
 	/* Create the socket and listen to cennections */
 	sock = create_socket(val.port);
@@ -328,7 +322,7 @@ int main(int argc, char *argv[])
 	}
 
 	/* Print starting information */
-	printf("%s%d\n", "shttpd server started at port: ", val.port);
+	slog(0, "[LIVE] Server started listen at port: %d ", val.port);
 
 	/* Initialize the set of active sockets. */
 	FD_ZERO(&active_fd_set);
@@ -365,7 +359,7 @@ int main(int argc, char *argv[])
 				else
 				{
 					/* Read request and answer */
-					if(accept_request(i, val.verbose, val.root)) 
+					if(accept_request(i, val.root)) 
 					{
 						close(i);
 						FD_CLR(i, &active_fd_set);

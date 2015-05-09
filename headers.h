@@ -1,27 +1,40 @@
-/*--------------------------------------------
+/*-----------------------------------------------------
 Name: header.h
-Description: header file of header functions       
---------------------------------------------*/
+Date: 2015.05.09
+Auth: Sun Dro (a.k.a 7th Ghost / kala13x)
+Desc: Header file of header functions
+-----------------------------------------------------*/
 
-#include <stdio.h>
-#define SERVERAGENT "shttpd/0.3.1\r\n"
 
-/*--------------------------------------------
-Server status OK header                     */
+#include "stdinc.h"
+#define SERVERAGENT "shttpd/1.0.3\r\n"
+
+
+/*---------------------------------------------
+| Server status OK header
+---------------------------------------------*/
 void headers(int client, const char *filename);
 
-/*--------------------------------------------
-Not found heasder                           */
-void not_found(int client);
 
-/*--------------------------------------------
-Bad request heasder                         */
+/*---------------------------------------------
+| Not found heasder
+---------------------------------------------*/
+void not_found(int client, char* path);
+
+
+/*---------------------------------------------
+| Bad request heasder
+---------------------------------------------*/
 void bad_request(int client);
 
-/*--------------------------------------------
-Internal error heasder                      */
+
+/*---------------------------------------------
+| Internal error heasder
+---------------------------------------------*/
 void internal_error(int client);
 
-/*--------------------------------------------
-Unimplemented error heasder                 */
+
+/*---------------------------------------------
+| Unimplemented error heasder                 
+---------------------------------------------*/
 void unimplemented(int client);
