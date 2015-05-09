@@ -1,6 +1,6 @@
-## shttpd 1.0.3 Snapshot
+## sHTTPD 1.0.3 Snapshot
 ###Description
-shttpd is simple http non-blocking web server which uses tcp sockets and select(). Softwear is written for educational purposes and is distributed in the hope that it will be useful for anyone interested in this field.
+shttpd is simple http non-blocking web server which uses tcp sockets and select(). Software is written for educational purposes and is distributed in the hope that it will be useful for anyone interested in this field.
 
 ###Usage
 ```
